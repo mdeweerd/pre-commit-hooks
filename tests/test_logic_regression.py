@@ -5,6 +5,7 @@ This file contains tests that specifically validate fixes for bugs
 that were found and corrected. These tests serve as regression guards
 to ensure the bugs don't reappear in future changes.
 """
+
 import os
 import subprocess as sp
 import tempfile
@@ -40,14 +41,12 @@ class TestClangTidyFixErrorsLogic:
         """Create a C file with errors that clang-tidy will catch."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".c", delete=False) as f:
             # Code with unused variable - clang-tidy will complain
-            f.write(
-                """
+            f.write("""
 int main() {
     int unused_variable;
     return 0;
 }
-"""
-            )
+""")
             temp_file = f.name
         yield temp_file
         if os.path.exists(temp_file):
@@ -224,10 +223,9 @@ class TestDefaultArgumentsRegression:
             # These defaults should be present
             assert "-q" in cmd.args
             assert "--error-exitcode=1" in cmd.args
-            assert "--enable=all" in cmd.args
+            assert "--enable=warning,performance,portability,information,style,missingInclude" in cmd.args
             assert "--suppress=unmatchedSuppression" in cmd.args
             assert "--suppress=missingIncludeSystem" in cmd.args
-            assert "--suppress=unusedFunction" in cmd.args
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -272,16 +270,10 @@ class TestDefaultArgumentsRegression:
             # Args should be version-appropriate
             if cmd.version >= "20":
                 # New version uses double dashes
-                assert (
-                    "--max-priority-3" in cmd.args
-                    or "--enable-global-analysis" in cmd.args
-                )
+                assert "--max-priority-3" in cmd.args or "--enable-global-analysis" in cmd.args
             else:
                 # Old version uses single dashes
-                assert (
-                    "-max-priority-3" in cmd.args
-                    or "-enable-global-analysis" in cmd.args
-                )
+                assert "-max-priority-3" in cmd.args or "-enable-global-analysis" in cmd.args
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -332,9 +324,7 @@ class TestFormatterBehaviorRegression:
             temp_file = f.name
 
         try:
-            cmd = UncrustifyCmd(
-                ["uncrustify-hook", "--replace", "--no-backup", temp_file]
-            )
+            cmd = UncrustifyCmd(["uncrustify-hook", "--replace", "--no-backup", temp_file])
             assert cmd.edit_in_place is True
         finally:
             if os.path.exists(temp_file):

@@ -8,6 +8,7 @@ Tests cover:
 - Version checking edge cases
 - Logic error regression tests
 """
+
 import os
 import subprocess as sp
 import sys
@@ -22,7 +23,9 @@ from hooks.cppcheck import CppcheckCmd
 from hooks.cpplint import CpplintCmd
 from hooks.oclint import OCLintCmd
 from hooks.uncrustify import UncrustifyCmd
-from hooks.utils import Command, FormatterCmd, StaticAnalyzerCmd
+from hooks.utils import Command
+from hooks.utils import FormatterCmd
+from hooks.utils import StaticAnalyzerCmd
 
 
 class TestArgumentParsing:
@@ -184,7 +187,7 @@ class TestCppcheckDefaults:
             sys.argv = original_argv
             assert "-q" in cmd.args
             assert "--error-exitcode=1" in cmd.args
-            assert "--enable=all" in cmd.args
+            assert "--enable=warning,performance,portability,information,style,missingInclude" in cmd.args
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -203,7 +206,7 @@ class TestCppcheckDefaults:
             sys.argv = original_argv
             # User's --enable=warning should be present
             assert "--enable=warning" in cmd.args
-            # Default --enable=all should not be added because user provided --enable
+            # Default --enable=warning,performance,portability,information,style,missingInclude should not be added because user provided --enable
             assert cmd.args.count("--enable=warning") == 1
         finally:
             if os.path.exists(temp_file):
@@ -219,9 +222,7 @@ class TestUncrustifyDefaults:
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
                 os.chdir(tmpdir)
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".c", delete=False, dir=tmpdir
-                ) as f:
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".c", delete=False, dir=tmpdir) as f:
                     f.write("int main() { return 0; }\n")
                     temp_file = f.name
 
@@ -308,7 +309,7 @@ class TestIncludeWhatYouUse:
         # that checks for "has correct #includes/fwd-decls" in stderr
         with tempfile.NamedTemporaryFile(mode="w", suffix=".c", delete=False) as f:
             # Write a simple valid C file
-            f.write("#include <stdio.h>\nint main() { printf(\"test\"); return 0; }\n")
+            f.write('#include <stdio.h>\nint main() { printf("test"); return 0; }\n')
             temp_file = f.name
 
         try:

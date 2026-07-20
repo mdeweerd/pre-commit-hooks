@@ -34,7 +34,7 @@ function run_uncrustify {
 }
 
 function run_cppcheck {
-  cppcheck "$1" -q --error-exitcode=1 --suppress=missingIncludeSystem --enable=all
+  cppcheck "$1" -q --error-exitcode=1 --suppress=missingIncludeSystem --enable=warning,performance,portability,information,style,missingInclude
 }
 
 function assert_eq {

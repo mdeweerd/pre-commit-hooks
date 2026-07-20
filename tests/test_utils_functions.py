@@ -4,14 +4,18 @@
 Tests cover the helper functions and base class methods that aren't
 fully covered by the integration tests.
 """
+
 import os
 import subprocess as sp
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from hooks.utils import Command, FormatterCmd, StaticAnalyzerCmd
+from hooks.utils import Command
+from hooks.utils import FormatterCmd
+from hooks.utils import StaticAnalyzerCmd
 
 
 class TestCommandBaseClass:
@@ -42,6 +46,7 @@ class TestCommandBaseClass:
         try:
             # Temporarily modify sys.argv to simulate command-line args
             import sys
+
             original_argv = sys.argv
             sys.argv = ["test-cmd", temp_file]
 
@@ -61,9 +66,7 @@ class TestCommandBaseClass:
 
     def test_cfg_files_filtered_out(self):
         """Test that .cfg files are filtered from file list."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".cfg", delete=False
-        ) as cfg_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".cfg", delete=False) as cfg_file:
             cfg_file.write("config\n")
             cfg_path = cfg_file.name
 
@@ -74,6 +77,7 @@ class TestCommandBaseClass:
         try:
             # Temporarily modify sys.argv to simulate command-line args
             import sys
+
             original_argv = sys.argv
             sys.argv = ["test-cmd", cfg_path, c_path]
 
@@ -171,6 +175,92 @@ class TestCommandBaseClass:
         cmd.add_if_missing(["--key=different"])
         assert len(cmd.args) == initial_length
 
+    def test_add_if_missing_with_multiple_same_key_args_in_one_call(self):
+        """Test that add_if_missing can add multiple same-key args in a single call.
+
+        When add_if_missing is called with multiple arguments that share the same
+        option key, all are added because it only checks if the first arg's key exists.
+        """
+
+        class TestCmd(Command):
+            def __init__(self):
+                self.command = "test"
+                self.look_behind = "test"
+                self.args = []
+                self.files = []
+
+        cmd = TestCmd()
+        # Add multiple --suppress arguments at once
+        cmd.add_if_missing(
+            [
+                "--suppress=unmatchedSuppression",
+                "--suppress=missingIncludeSystem",
+            ]
+        )
+        # Both are added because the key check only looks at the first arg
+        assert "--suppress=unmatchedSuppression" in cmd.args
+        assert "--suppress=missingIncludeSystem" in cmd.args
+
+    def test_add_if_missing_bug_with_multiple_calls_default(self):
+        """Test the original behavior: with allow_multiple=False (default),
+        same-key args across multiple calls are NOT added.
+        """
+
+        class TestCmd(Command):
+            def __init__(self):
+                self.command = "test"
+                self.look_behind = "test"
+                self.args = []
+                self.files = []
+
+        cmd = TestCmd()
+        # Add first --suppress argument
+        cmd.add_if_missing(["--suppress=unmatchedSuppression"])
+        assert "--suppress=unmatchedSuppression" in cmd.args
+
+        # Now try to add another --suppress argument in a separate call (default allow_multiple=False)
+        initial_length = len(cmd.args)
+        cmd.add_if_missing(["--suppress=missingIncludeSystem"])
+        # With default behavior, this does NOT add the new argument because --suppress key already exists
+        assert "--suppress=missingIncludeSystem" not in cmd.args
+        assert len(cmd.args) == initial_length
+
+    def test_add_if_missing_with_allow_multiple_true(self):
+        """Test that with allow_multiple=True, same-key args with different values
+        can be added across multiple calls, and --key=value and --key value forms
+        are treated as equivalent."""
+
+        class TestCmd(Command):
+            def __init__(self):
+                self.command = "test"
+                self.look_behind = "test"
+                self.args = []
+                self.files = []
+
+        cmd = TestCmd()
+        # Add first --suppress argument
+        cmd.add_if_missing(["--suppress=unmatchedSuppression"], allow_multiple=True)
+        assert "--suppress=unmatchedSuppression" in cmd.args
+
+        # Now add another --suppress argument in a separate call with allow_multiple=True
+        initial_length = len(cmd.args)
+        cmd.add_if_missing(["--suppress=missingIncludeSystem"], allow_multiple=True)
+        # With allow_multiple=True, this DOES add the new argument
+        assert "--suppress=missingIncludeSystem" in cmd.args
+        assert len(cmd.args) == initial_length + 1
+
+        # But duplicate with space form is not added
+        cmd.add_if_missing(["--suppress", "unmatchedSuppression"], allow_multiple=True)
+        assert len(cmd.args) == 2  # Still 2, not 3 (space form treated as equivalent)
+
+        # Test with space form first
+        cmd2 = TestCmd()
+        cmd2.add_if_missing(["--suppress", "value1"], allow_multiple=True)
+        assert cmd2.args == ["--suppress", "value1"]
+        # Then --suppress=value1 should not be added
+        cmd2.add_if_missing(["--suppress=value1"], allow_multiple=True)
+        assert len(cmd2.args) == 2  # Still 2, not 3
+
     def test_raise_error_writes_to_stderr(self):
         """Test that raise_error writes formatted error to stderr."""
 
@@ -205,13 +295,9 @@ class TestVersionParsing:
 
         # Mock the subprocess to return a known version string
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                stdout=b"clang-format version 14.0.0\n", returncode=0
-            )
+            mock_run.return_value = MagicMock(stdout=b"clang-format version 14.0.0\n", returncode=0)
 
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".c", delete=False
-            ) as temp_file:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".c", delete=False) as temp_file:
                 temp_file.write("int main() { return 0; }\n")
                 temp_path = temp_file.name
 

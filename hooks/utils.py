@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """fns for clang-format, clang-tidy, oclint"""
+
 import difflib
 import os
 import re
@@ -50,7 +51,8 @@ class Command:
             sp_child = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
             if sp_child.stderr or sp_child.returncode != 0:
                 self.raise_error(
-                    "Problem determining which files are being committed using git.", sp_child.stderr.decode()
+                    "Problem determining which files are being committed using git.",
+                    sp_child.stderr.decode(),
                 )
             added_files = sp_child.stdout.decode().splitlines()
         return added_files
@@ -74,21 +76,86 @@ class Command:
         is_cmd_clang_analyzer = self.command == "clang-tidy" or self.command == "oclint"
         has_args = self.files or self.args or "version" in self.args
         if not has_args and not is_cmd_clang_analyzer:
-            self.raise_error("Missing arguments", "No file arguments found and no files are pending commit.")
+            self.raise_error(
+                "Missing arguments",
+                "No file arguments found and no files are pending commit.",
+            )
 
-    def add_if_missing(self, new_args: List[str]):
+    def add_if_missing(self, new_args: List[str], allow_multiple: bool = False):
         """Add a default if it's missing from the command. This library
         exists to force checking, so prefer those options.
         len(new_args) should be 1, or 2 for options like --key=value
 
-        If first arg is missing, add new_args to command's args
+        If allow_multiple is False (default):
+            Only add new_args if the first arg's key doesn't exist in self.args.
+            If first arg is missing, add new_args to command's args.
+        If allow_multiple is True:
+            Add each arg only if its key-value pair is not already present.
+            Handles both --key=value and --key value forms as equivalent.
         Do not change an option - in those cases return."""
-        new_arg_key = new_args[0].split("=")[0]
-        for arg in self.args:
-            existing_arg_key = arg.split("=")[0]
-            if existing_arg_key == new_arg_key:
-                return
-        self.args += new_args
+        if allow_multiple:
+            # Helper to extract key-value pairs from args list
+            def get_key_value_pairs(args_list):
+                pairs = set()
+                i = 0
+                while i < len(args_list):
+                    arg = args_list[i]
+                    if "=" in arg:
+                        # --key=value form
+                        key = arg.split("=")[0]
+                        value = arg.split("=", 1)[1]
+                        pairs.add((key, value))
+                        i += 1
+                    elif arg.startswith("-") and i + 1 < len(args_list) and not args_list[i + 1].startswith("-"):
+                        # --key value form
+                        key = arg
+                        value = args_list[i + 1]
+                        pairs.add((key, value))
+                        i += 2
+                    else:
+                        # Single arg (flag)
+                        pairs.add((arg, None))
+                        i += 1
+                return pairs
+
+            # Get existing key-value pairs
+            existing_pairs = get_key_value_pairs(self.args)
+
+            # Add new args that don't have matching key-value pairs
+            i = 0
+            while i < len(new_args):
+                new_arg = new_args[i]
+                if "=" in new_arg:
+                    # --key=value form
+                    key = new_arg.split("=")[0]
+                    value = new_arg.split("=", 1)[1]
+                    if (key, value) not in existing_pairs:
+                        self.args.append(new_arg)
+                        existing_pairs.add((key, value))
+                    i += 1
+                elif new_arg.startswith("-") and i + 1 < len(new_args) and not new_args[i + 1].startswith("-"):
+                    # --key value form
+                    key = new_arg
+                    value = new_args[i + 1]
+                    if (key, value) not in existing_pairs:
+                        self.args.append(new_arg)
+                        self.args.append(new_args[i + 1])
+                        existing_pairs.add((key, value))
+                    i += 2
+                else:
+                    # Single arg (flag)
+                    if (new_arg, None) not in existing_pairs:
+                        self.args.append(new_arg)
+                        existing_pairs.add((new_arg, None))
+                    i += 1
+        else:
+            # Original behavior: check first arg's key, add all or nothing
+            new_arg_key = new_args[0].split("=")[0]
+            for arg in self.args:
+                existing_arg_key = arg.split("=")[0]
+                if existing_arg_key == new_arg_key:
+                    return
+            self.args += new_args
 
     def assert_version(self, actual_ver: str, expected_ver: str):
         """--version hook arg enforces specific versions of tools."""
@@ -97,9 +164,7 @@ class Command:
             problem = "Version of " + self.command + " is wrong"
             details = """Expected version: {}
 Found version: {}
-Edit your pre-commit config or use a different version of {}.""".format(
-                expected_ver, actual_ver, self.command
-            )
+Edit your pre-commit config or use a different version of {}.""".format(expected_ver, actual_ver, self.command)
             self.raise_error(problem, details)
         # If the version is correct, exit normally
         sys.exit(0)
@@ -136,10 +201,10 @@ class StaticAnalyzerCmd(Command):
     def __init__(self, command: str, look_behind: str, args: List[str]):
         super().__init__(command, look_behind, args)
 
-    def run_command(self, args: List[str]):
+    def run_command(self, args: List[str], input_data: bytes = None):
         """Run the command and check for errors. Args includes options and filepaths"""
         args = [self.command, *args]
-        sp_child = sp.run(args, stdout=sp.PIPE, stderr=sp.PIPE)
+        sp_child = sp.run(args, stdout=sp.PIPE, stderr=sp.PIPE, input=input_data)
         self.stdout += sp_child.stdout
         self.stderr += sp_child.stderr
         self.returncode = sp_child.returncode
@@ -173,7 +238,13 @@ class FormatterCmd(Command):
             # no stdout. So compare the before/after file for hook pass/fail
             expected = self.get_filelines(filename_str)
         diff = list(
-            difflib.diff_bytes(difflib.unified_diff, actual, expected, fromfile=b"original", tofile=b"formatted")
+            difflib.diff_bytes(
+                difflib.unified_diff,
+                actual,
+                expected,
+                fromfile=b"original",
+                tofile=b"formatted",
+            )
         )
         if len(diff) > 0:
             if not self.no_diff_flag:
