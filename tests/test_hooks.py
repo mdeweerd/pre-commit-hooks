@@ -183,7 +183,8 @@ Error while processing {0}.
 
     @classmethod
     def generate_cppcheck_tests(cls):
-        cppcheck_arg_sets = [[]]
+        # Test with no additional args, with -j option, and with -j2 option
+        cppcheck_arg_sets = [[], ["-j", "2"], ["-j2"]]
         # cppcheck adds unnecessary error information.
         # See https://stackoverflow.com/questions/6986033
         if cls.versions["cppcheck"] <= "1.88":

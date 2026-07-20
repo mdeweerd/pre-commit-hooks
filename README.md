@@ -8,12 +8,12 @@
 This is a [pre-commit](https://pre-commit.com) hooks repo that
 integrates two C/C++ code formatters:
 > [clang-format](https://clang.llvm.org/docs/ClangFormatStyleOptions.html),
-[uncrustify](http://uncrustify.sourceforge.net/),
+[uncrustify](https://uncrustify.sourceforge.net/),
 
 and five C/C++ static code analyzers:
 > [clang-tidy](https://clang.llvm.org/extra/clang-tidy/),
-[oclint](http://oclint.org/),
-[cppcheck](http://cppcheck.sourceforge.net/),
+[oclint](https://oclint.org/),
+[cppcheck](https://cppcheck.sourceforge.net/),
 [cpplint](https://github.com/cpplint/cpplint),
 [include-what-you-use](https://github.com/include-what-you-use/include-what-you-use)
 
@@ -238,7 +238,7 @@ These options are automatically added to enable all errors or are required.
 
 * oclint: `["-enable-global-analysis", "-enable-clang-static-analyzer", "-max-priority-3", "0"]`
 * uncrustify: `["-c", "defaults.cfg", "-q"]` (options added, and a defaults.cfg generated, if -c is missing)
-* cppcheck: `["-q" , "--error-exitcode=1", "--enable=all", "--suppress=unmatchedSuppression", "--suppress=missingIncludeSystem", "--suppress=unusedFunction"]` (See https://github.com/pocc/pre-commit-hooks/pull/30)
+* cppcheck: `["-q" , "--error-exitcode=1", "--enable=warning,performance,portability,information,style,missingInclude", "--suppress=unmatchedSuppression", "--suppress=missingIncludeSystem"]` (See https://github.com/pocc/pre-commit-hooks/pull/30)
 * cpplint: `["--verbose=0"]`
 
 If you supply any of these options in `args:`, your options will override the above defaults (use `-<flag>=<option>` if possible when overriding).
@@ -297,9 +297,9 @@ Use these commands to install some or all of the linters used in this project:
 | ------------------------------------------------------------------------ | -------------------- | ------------------------------------- |
 | [clang-format](https://clang.llvm.org/docs/ClangFormatStyleOptions.html) | Formatter            | C, C++, ObjC, ObjC++, Java            |
 | [clang-tidy](https://clang.llvm.org/extra/clang-tidy/)                   | Static code analyzer | C, C++, ObjC                          |
-| [oclint](http://oclint.org/)                                             | Static code analyzer | C, C++, ObjC                          |
-| [uncrustify](http://uncrustify.sourceforge.net/)                         | Formatter            | C, C++, C#, ObjC, D, Java, Pawn, Vala |
-| [cppcheck](http://cppcheck.sourceforge.net/)                             | Static code analyzer | C, C++                                |
+| [oclint](https://oclint.org/)                                            | Static code analyzer | C, C++, ObjC                          |
+| [uncrustify](https://uncrustify.sourceforge.net/)                        | Formatter            | C, C++, C#, ObjC, D, Java, Pawn, Vala |
+| [cppcheck](https://cppcheck.sourceforge.net/)                            | Static code analyzer | C, C++                                |
 | [cpplint](https://github.com/cpplint/cpplint)                            | Style checker        | C, C++                                |
 | [include-what-you-use](https://github.com/include-what-you-use/include-what-you-use) | Static code analyzer | C, C++                    |
 
@@ -309,9 +309,9 @@ Use these commands to install some or all of the linters used in this project:
 | ------------------------------------------------------------------------ | ------------ | --------------------------------------------- | --------------- |
 | [clang-format](https://clang.llvm.org/docs/ClangFormatStyleOptions.html) | `-i`         |                   | |
 | [clang-tidy](https://clang.llvm.org/extra/clang-tidy/)                   | `--fix-errors` [1] | `-checks=*` `-warnings-as-errors=*` [2] | |
-| [oclint](http://oclint.org/)                                             |  | `-enable-global-analysis` `-enable-clang-static-analyzer` `-max-priority-3 0` [3] | `-rc=<key>=<value>` |
-| [uncrustify](http://uncrustify.sourceforge.net/)                         | `--replace` `--no-backup` [4] |  | `--set key=value` |
-| [cppcheck](http://cppcheck.sourceforge.net/)                             |  | `-enable=all` | |
+| [oclint](https://oclint.org/)                                            |  | `-enable-global-analysis` `-enable-clang-static-analyzer` `-max-priority-3 0` [3] | `-rc=<key>=<value>` |
+| [uncrustify](https://uncrustify.sourceforge.net/)                        | `--replace` `--no-backup` [4] |  | `--set key=value` |
+| [cppcheck](https://cppcheck.sourceforge.net/)                            |  | `--enable=warning,performance,portability,information,style,missingInclude` | |
 | [cpplint](https://github.com/cpplint/cpplint)                            |  | `--verbose=0` |  |
 | [include-what-you-use](https://github.com/include-what-you-use/include-what-you-use) | | `--verbose=3` | |
 
@@ -363,7 +363,7 @@ See [README_dev.md](README_dev.md)
 
 ### oclint
 
-* [Official Docs](http://oclint.org/)
+* [Official Docs](https://oclint.org/)
 * [Fastlane Integration](https://docs.fastlane.tools/actions/oclint/)
 * [Source Code](https://github.com/oclint/oclint)
 
@@ -375,13 +375,13 @@ unaffected. Building from source needs `ENABLE_EXPORTS` on the driver target so 
 
 ### uncrustify
 
-* [Official Docs](http://uncrustify.sourceforge.net/)
+* [Official Docs](https://uncrustify.sourceforge.net/)
 * [Getting Started with Uncrustify](https://patrickhenson.com/2018/06/07/uncrustify-configuration.html)
 * [Source Code](https://github.com/uncrustify/uncrustify)
 
 ### cppcheck
 
-* [Official Docs](http://cppcheck.sourceforge.net/)
+* [Official Docs](https://cppcheck.sourceforge.net/)
 * [Using Cppcheck](https://katecpp.wordpress.com/2015/08/04/cppcheck/)
 * [Source Code](https://github.com/danmar/cppcheck)
 

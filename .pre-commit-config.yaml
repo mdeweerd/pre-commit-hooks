@@ -8,7 +8,7 @@ fail_fast: true
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: 1f6de3d70391131fac4b911ae913c568e571e34e
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
     hooks:
       - id: trailing-whitespace
         exclude: \.output
@@ -19,21 +19,20 @@ repos:
       - id: check-yaml
       - id: debug-statements
       - id: requirements-txt-fixer
-  - repo: https://github.com/asottile/reorder_python_imports
-    rev: bc7b5b2f0fde191c9d0121588ef9bbb79f8e5e21
+  - repo: https://github.com/PyCQA/isort
+    rev: d5f40fa0553aa4bba71fcd73cf42933ae14d5116  # 9.0.0b5
     hooks:
-      - id: reorder-python-imports
-        language_version: python3
+      - id: isort
   - repo: https://github.com/pre-commit/pre-commit
-    rev: v2.16.0
+    rev: 9767b6c8211a6bf683875a0afcf2b390457a4b66  # v4.6.2
     hooks:
     -   id: validate_manifest
   - repo: https://github.com/asottile/pyupgrade
-    rev: v1.16.1
+    rev: 75992aaa40730136014f34227e0135f63fc951b4  # v3.21.2
     hooks:
       - id: pyupgrade
   - repo: https://github.com/ambv/black
-    rev: cea13f498418784e22f8fbd78db3f9240a2bad11
+    rev: 87928e6d6761a4a6d22250e1fee5601b3998086e  # 26.5.1
     hooks:
       - id: black
         args: ["-l", "120"]
@@ -41,7 +40,8 @@ repos:
     hooks:
       - id: tests
         name: tests
-        entry: bash -c "pip install . && pytest -v -xxx"
+        entry: pytest -v -xxx
         description: Tests expected output of all scripts
-        language: system
+        language: python
         types: [python]
+        additional_dependencies: ["."]
