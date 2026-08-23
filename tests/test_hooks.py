@@ -30,6 +30,35 @@ from hooks.oclint import OCLintCmd
 from hooks.uncrustify import UncrustifyCmd
 
 
+def clang_tidy_checks_arg(version: str) -> str:
+    """Build the -checks argument for the installed clang-tidy.
+
+    clang-tidy 22 treats an empty enabled-check list as an error and no longer
+    counts clang-diagnostic-* globs as checks, so a real check has to be named
+    for the compiler diagnostic to be reported at all. Naming one on older
+    versions is not free: they then compile the file and print
+    "N warnings generated." to stderr, which the hook reports as a failure.
+    """
+    base = "clang-diagnostic-return-type"
+    major = 0
+    if version and version[0].isdigit():
+        major = int(version.split(".")[0])
+    if major >= 22:
+        # llvm-namespace-comment never fires on the test files
+        return f"-checks={base},llvm-namespace-comment"
+    return f"-checks={base}"
+
+
+def strip_generated_counts(text: bytes) -> bytes:
+    """Remove clang's "N warnings/errors generated." summary lines.
+
+    Whether clang emits these, and whether they end in a newline, varies by
+    version and platform, so they are removed from both expected and actual
+    output rather than being matched.
+    """
+    return re.sub(rb"\d+ (warnings?|errors?)( and \d+ (warnings?|errors?))? generated\.\r?\n?", b"", text)
+
+
 class GeneratorT:
     """Generate the test scenarios"""
 
@@ -121,14 +150,15 @@ class GeneratorT:
     @classmethod
     def generate_clang_tidy_tests(cls):
         """Don't care about warnings. They'll be removed in later tests."""
-        ct_base_args = ["-quiet", "-checks=clang-diagnostic-return-type"]
+        ct_base_args = ["-quiet", clang_tidy_checks_arg(cls.versions["clang-tidy"])]
         # Run normal, plus two in-place arguments
         additional_args = [[], ["-fix"], ["--fix-errors"], ["--", "-std=c18"]]
         clang_tidy_args_sets = [ct_base_args + arg for arg in additional_args]
+        # "1 error generated." is intentionally absent: clang-tidy 22 no longer prints it,
+        # and strip_generated_counts() removes it from the actual output on versions that do.
         clang_tidy_err_str = """{0}:2:18: error: non-void function 'main' should return a value [clang-diagnostic-return-type]
     2 | int main(){{int i;return;}}
       |                  ^
-1 error generated.
 Error while processing {0}.
 """  # noqa: E501
         clang_tidy_str_c = clang_tidy_err_str.format(cls.err_c, "").encode()
@@ -354,6 +384,14 @@ class TestHooks:
             s["args"] = [arg.replace("{repo_dir}", os.getcwd()) for arg in s["args"]]
             s["files"] = [arg.replace("{test_dir}", tmpdir) for arg in s["files"]]
             s["expd_output"] = s["expd_output"].replace("{test_dir}", tmpdir)
+            # The table stores the pre-22 form; newer clang-tidy needs a real check named
+            if s["command"] == "clang-tidy":
+                s["args"] = [
+                    clang_tidy_checks_arg(versions["clang-tidy"])
+                    if arg == "-checks=clang-diagnostic-return-type"
+                    else arg
+                    for arg in s["args"]
+                ]
 
             if os.name == "nt":
                 s["files"] = [arg.replace("/", "\\\\") for arg in s["files"]]
@@ -419,9 +457,11 @@ class TestHooks:
         # Newer cppcheck versions include a checkers report info line
         if cmd_name == "cppcheck":
             output_actual = re.sub(rb"\nnofile:0:0: information: Active checkers.*\n+", b"\n", output_actual)
-        # Filter out "X warnings generated." from clang-tidy (macOS with SDK configured)
+        # Whether clang prints "N warnings/errors generated." varies by version and
+        # platform, and it may arrive without a trailing newline. Drop it either way.
         if cmd_name == "clang-tidy":
-            output_actual = re.sub(rb"\d+ warnings? generated\.\n", b"", output_actual)
+            output_actual = strip_generated_counts(output_actual)
+            target_output = strip_generated_counts(target_output)
         # Windows/macOS clang uses return-mismatch instead of return-type
         if cmd_name in ["clang-tidy", "include-what-you-use"]:
             output_actual = output_actual.replace(b"clang-diagnostic-return-mismatch", b"clang-diagnostic-return-type")
@@ -488,14 +528,9 @@ class TestHooks:
             actual = re.sub(rb"[\d,]+ warnings and ", b"", actual)
         # Filter out "X warnings generated." from clang-tidy (macOS with SDK configured)
         if cmd_name == "clang-tidy":
-            # Filter warnings/errors count and track if we filtered it
-            # Patterns: "X warnings generated." or "X warnings and Y error(s) generated."
+            target_output = strip_generated_counts(target_output)
             before_filter = actual
-            filtered_actual = re.sub(rb"\d+ warnings? generated\.\n", b"", actual)
-            # Also filter combined pattern like "148 warnings and 1 error generated."
-            filtered_actual = re.sub(rb"\d+ warnings? and \d+ errors? generated\.\n",
-                                    lambda m: re.sub(rb"\d+ warnings? and ", b"", m.group(0)),
-                                    filtered_actual)
+            filtered_actual = strip_generated_counts(actual)
             filtered_warnings_count = (filtered_actual != before_filter)
             # Filter errors from macOS SDK system headers
             lines = filtered_actual.split(b"\n")
